@@ -4,7 +4,6 @@ using Abp.IdentityFramework;
 using Abp.Organizations;
 using Abp.Zero.SampleApp.MultiTenancy;
 using Abp.Zero.SampleApp.Users;
-using Abp.Zero.SampleApp.Users.Dto;
 using Microsoft.AspNet.Identity;
 using Shouldly;
 using Xunit;
@@ -67,7 +66,6 @@ namespace Abp.Zero.SampleApp.Tests.Users
         [Fact]
         public async Task Should_Remove_User_From_Organization_When_User_Is_Deleted()
         {
-
             //Arrange
             var user = CreateAndGetTestUser();
             var ou11 = GetOU("OU11");
@@ -122,7 +120,7 @@ namespace Abp.Zero.SampleApp.Tests.Users
 
         private User CreateAndGetTestUser()
         {
-            _userManager.Create(
+            WithUnitOfWork(() => _userManager.Create(
                 new User
                 {
                     EmailAddress = "emre@aspnetboilerplate.com",
@@ -131,7 +129,7 @@ namespace Abp.Zero.SampleApp.Tests.Users
                     UserName = "yunus.emre",
                     IsEmailConfirmed = true,
                     Password = "AM4OLBpptxBYmM79lGOX9egzZk3vIQU3d/gFCJzaBjAPXzYIK3tQ2N7X4fcrHtElTw==" //123qwe
-                });
+                }));
 
             return UsingDbContext(
                 context =>

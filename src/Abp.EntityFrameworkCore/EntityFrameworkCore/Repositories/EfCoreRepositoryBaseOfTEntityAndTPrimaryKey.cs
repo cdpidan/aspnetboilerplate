@@ -137,7 +137,7 @@ namespace Abp.EntityFrameworkCore.Repositories
         {
             entity = Insert(entity);
 
-            if (entity.IsTransient())
+            if (MayHaveTemporaryKey(entity) || entity.IsTransient())
             {
                 Context.SaveChanges();
             }
@@ -149,7 +149,7 @@ namespace Abp.EntityFrameworkCore.Repositories
         {
             entity = await InsertAsync(entity);
 
-            if (entity.IsTransient())
+            if (MayHaveTemporaryKey(entity) || entity.IsTransient())
             {
                 await Context.SaveChangesAsync();
             }
@@ -161,7 +161,7 @@ namespace Abp.EntityFrameworkCore.Repositories
         {
             entity = InsertOrUpdate(entity);
 
-            if (entity.IsTransient())
+            if (MayHaveTemporaryKey(entity) || entity.IsTransient())
             {
                 Context.SaveChanges();
             }
@@ -173,7 +173,7 @@ namespace Abp.EntityFrameworkCore.Repositories
         {
             entity = await InsertOrUpdateAsync(entity);
 
-            if (entity.IsTransient())
+            if (MayHaveTemporaryKey(entity) || entity.IsTransient())
             {
                 await Context.SaveChangesAsync();
             }
@@ -190,8 +190,7 @@ namespace Abp.EntityFrameworkCore.Repositories
 
         public override Task<TEntity> UpdateAsync(TEntity entity)
         {
-            AttachIfNot(entity);
-            Context.Entry(entity).State = EntityState.Modified;
+            entity = Update(entity);
             return Task.FromResult(entity);
         }
 
@@ -284,6 +283,26 @@ namespace Abp.EntityFrameworkCore.Repositories
                 );
 
             return entry?.Entity as TEntity;
+        }
+
+        private static bool MayHaveTemporaryKey(TEntity entity)
+        {
+            if (typeof(TPrimaryKey) == typeof(byte))
+            {
+                return true;
+            }
+
+            if (typeof(TPrimaryKey) == typeof(int))
+            {
+                return Convert.ToInt32(entity.Id) <= 0;
+            }
+
+            if (typeof(TPrimaryKey) == typeof(long))
+            {
+                return Convert.ToInt64(entity.Id) <= 0;
+            }
+
+            return false;
         }
     }
 }

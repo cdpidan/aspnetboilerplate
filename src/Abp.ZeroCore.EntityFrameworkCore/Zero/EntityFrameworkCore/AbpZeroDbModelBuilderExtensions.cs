@@ -6,6 +6,7 @@ using Abp.Authorization.Roles;
 using Abp.Authorization.Users;
 using Abp.BackgroundJobs;
 using Abp.Configuration;
+using Abp.EntityHistory;
 using Abp.Localization;
 using Abp.MultiTenancy;
 using Abp.Notifications;
@@ -38,6 +39,9 @@ namespace Abp.Zero.EntityFrameworkCore
             SetTableName<AuditLog>(modelBuilder, prefix + "AuditLogs", schemaName);
             SetTableName<BackgroundJobInfo>(modelBuilder, prefix + "BackgroundJobs", schemaName);
             SetTableName<Edition>(modelBuilder, prefix + "Editions", schemaName);
+            SetTableName<EntityChange>(modelBuilder, prefix + "EntityChanges", schemaName);
+            SetTableName<EntityChangeSet>(modelBuilder, prefix + "EntityChangeSets", schemaName);
+            SetTableName<EntityPropertyChange>(modelBuilder, prefix + "EntityPropertyChanges", schemaName);
             SetTableName<FeatureSetting>(modelBuilder, prefix + "Features", schemaName);
             SetTableName<TenantFeatureSetting>(modelBuilder, prefix + "Features", schemaName);
             SetTableName<EditionFeatureSetting>(modelBuilder, prefix + "Features", schemaName);
@@ -57,6 +61,7 @@ namespace Abp.Zero.EntityFrameworkCore
             SetTableName<TenantNotificationInfo>(modelBuilder, prefix + "TenantNotifications", schemaName);
             SetTableName<UserNotificationInfo>(modelBuilder, prefix + "UserNotifications", schemaName);
             SetTableName<UserOrganizationUnit>(modelBuilder, prefix + "UserOrganizationUnits", schemaName);
+            SetTableName<OrganizationUnitRole>(modelBuilder, prefix + "OrganizationUnitRoles", schemaName);
             SetTableName<UserRole>(modelBuilder, prefix + "UserRoles", schemaName);
             SetTableName<TUser>(modelBuilder, prefix + "Users", schemaName);
             SetTableName<UserAccount>(modelBuilder, prefix + "UserAccounts", schemaName);

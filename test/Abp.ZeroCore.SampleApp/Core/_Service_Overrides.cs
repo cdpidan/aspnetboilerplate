@@ -18,7 +18,6 @@ using Abp.Organizations;
 using Abp.Runtime.Caching;
 using Abp.Zero.Configuration;
 using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
@@ -30,7 +29,7 @@ namespace Abp.ZeroCore.SampleApp.Core
     {
         public UserManager(
             RoleManager roleManager,
-            UserStore store,
+            UserStore userStore,
             IOptions<IdentityOptions> optionsAccessor,
             IPasswordHasher<User> passwordHasher,
             IEnumerable<IUserValidator<User>> userValidators,
@@ -47,7 +46,7 @@ namespace Abp.ZeroCore.SampleApp.Core
             IOrganizationUnitSettings organizationUnitSettings,
             ISettingManager settingManager) : base(
             roleManager,
-            store,
+            userStore,
             optionsAccessor,
             passwordHasher,
             userValidators,
@@ -108,7 +107,9 @@ namespace Abp.ZeroCore.SampleApp.Core
             IPermissionManager permissionManager,
             ICacheManager cacheManager,
             IUnitOfWorkManager unitOfWorkManager,
-            IRoleManagementConfig roleManagementConfig
+            IRoleManagementConfig roleManagementConfig,
+            IRepository<OrganizationUnit, long> organizationUnitRepository,
+            IRepository<OrganizationUnitRole, long> organizationUnitRoleRepository
         ) : base(
             store,
             roleValidators,
@@ -118,7 +119,9 @@ namespace Abp.ZeroCore.SampleApp.Core
             permissionManager,
             cacheManager,
             unitOfWorkManager,
-            roleManagementConfig)
+            roleManagementConfig,
+            organizationUnitRepository,
+            organizationUnitRoleRepository)
         {
         }
     }
@@ -240,8 +243,10 @@ namespace Abp.ZeroCore.SampleApp.Core
             IRepository<UserRole, long> userRoleRepository,
             IRepository<UserLogin, long> userLoginRepository,
             IRepository<UserClaim, long> userClaimRepository,
-            IRepository<UserPermissionSetting, long> userPermissionSettingRepository
-        ) : base(
+            IRepository<UserPermissionSetting, long> userPermissionSettingRepository,
+            IRepository<UserOrganizationUnit, long> userOrganizationUnitRepository,
+            IRepository<OrganizationUnitRole, long> organizationUnitRoleRepository
+            ) : base(
             unitOfWorkManager,
             userRepository,
             roleRepository,
@@ -249,7 +254,9 @@ namespace Abp.ZeroCore.SampleApp.Core
             userRoleRepository,
             userLoginRepository,
             userClaimRepository,
-            userPermissionSettingRepository)
+            userPermissionSettingRepository,
+            userOrganizationUnitRepository,
+            organizationUnitRoleRepository)
         {
         }
     }

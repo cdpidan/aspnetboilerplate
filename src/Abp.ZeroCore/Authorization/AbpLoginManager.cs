@@ -108,7 +108,7 @@ namespace Abp.Authorization
             int? tenantId = tenant == null ? (int?)null : tenant.Id;
             using (UnitOfWorkManager.Current.SetTenantId(tenantId))
             {
-                var user = await UserManager.AbpStore.FindAsync(tenantId, login);
+                var user = await UserManager.FindAsync(tenantId, login);
                 if (user == null)
                 {
                     return new AbpLoginResult<TTenant, TUser>(AbpLoginResultType.UnknownExternalLogin, tenant);
@@ -166,10 +166,10 @@ namespace Abp.Authorization
             {
                 await UserManager.InitializeOptionsAsync(tenantId);
 
-                //TryLoginFromExternalAuthenticationSources method may create the user, that's why we are calling it before AbpStore.FindByNameOrEmailAsync
+                //TryLoginFromExternalAuthenticationSources method may create the user, that's why we are calling it before AbpUserStore.FindByNameOrEmailAsync
                 var loggedInFromExternalSource = await TryLoginFromExternalAuthenticationSources(userNameOrEmailAddress, plainPassword, tenant);
 
-                var user = await UserManager.AbpStore.FindByNameOrEmailAsync(tenantId, userNameOrEmailAddress);
+                var user = await UserManager.FindByNameOrEmailAsync(tenantId, userNameOrEmailAddress);
                 if (user == null)
                 {
                     return new AbpLoginResult<TTenant, TUser>(AbpLoginResultType.InvalidUserNameOrEmailAddress, tenant);
@@ -218,12 +218,6 @@ namespace Abp.Authorization
             {
                 return new AbpLoginResult<TTenant, TUser>(AbpLoginResultType.UserPhoneNumberIsNotConfirmed);
             }
-
-            user.LastLoginTime = Clock.Now;
-
-            await UserManager.AbpStore.UpdateAsync(user);
-
-            await UnitOfWorkManager.Current.SaveChangesAsync();
 
             var principal = await _claimsPrincipalFactory.CreateAsync(user);
 
@@ -301,7 +295,7 @@ namespace Abp.Authorization
                         var tenantId = tenant == null ? (int?)null : tenant.Id;
                         using (UnitOfWorkManager.Current.SetTenantId(tenantId))
                         {
-                            var user = await UserManager.AbpStore.FindByNameOrEmailAsync(tenantId, userNameOrEmailAddress);
+                            var user = await UserManager.FindByNameOrEmailAsync(tenantId, userNameOrEmailAddress);
                             if (user == null)
                             {
                                 user = await source.Object.CreateUserAsync(userNameOrEmailAddress, tenant);
@@ -320,7 +314,7 @@ namespace Abp.Authorization
                                     }
                                 }
 
-                                await UserManager.AbpStore.CreateAsync(user);
+                                await UserManager.CreateAsync(user);
                             }
                             else
                             {
@@ -328,7 +322,7 @@ namespace Abp.Authorization
 
                                 user.AuthenticationSource = source.Object.Name;
 
-                                await UserManager.AbpStore.UpdateAsync(user);
+                                await UserManager.UpdateAsync(user);
                             }
 
                             await UnitOfWorkManager.Current.SaveChangesAsync();

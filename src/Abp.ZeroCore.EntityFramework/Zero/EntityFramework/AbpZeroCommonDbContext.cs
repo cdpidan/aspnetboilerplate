@@ -6,7 +6,6 @@ using Abp.Auditing;
 using Abp.Authorization;
 using Abp.Authorization.Roles;
 using Abp.Authorization.Users;
-using Abp.BackgroundJobs;
 using Abp.Configuration;
 using Abp.EntityFramework;
 using Abp.Localization;
@@ -105,6 +104,11 @@ namespace Abp.Zero.EntityFramework
         /// UserOrganizationUnits.
         /// </summary>
         public virtual DbSet<UserOrganizationUnit> UserOrganizationUnits { get; set; }
+
+        /// <summary>
+        /// OrganizationUnitRoles.
+        /// </summary>
+        public virtual DbSet<OrganizationUnitRole> OrganizationUnitRoles { get; set; }
 
         /// <summary>
         /// Tenant notifications.
@@ -489,23 +493,6 @@ namespace Abp.Zero.EntityFramework
 
             #endregion
 
-
-            #region UserNotificationInfo.IX_UserId_State_CreationTime
-
-            modelBuilder.Entity<UserNotificationInfo>()
-                .Property(e => e.TenantId)
-                .CreateIndex("IX_UserId_State_CreationTime", 1);
-
-            modelBuilder.Entity<UserNotificationInfo>()
-                .Property(e => e.State)
-                .CreateIndex("IX_UserId_State_CreationTime", 2);
-
-            modelBuilder.Entity<UserNotificationInfo>()
-                .Property(e => e.CreationTime)
-                .CreateIndex("IX_UserId_State_CreationTime", 2);
-
-            #endregion
-
             #region UserOrganizationUnit.IX_TenantId_UserId
 
             modelBuilder.Entity<UserOrganizationUnit>()
@@ -525,6 +512,30 @@ namespace Abp.Zero.EntityFramework
                 .CreateIndex("IX_TenantId_OrganizationUnitId", 1);
 
             modelBuilder.Entity<UserOrganizationUnit>()
+                .Property(e => e.OrganizationUnitId)
+                .CreateIndex("IX_TenantId_OrganizationUnitId", 2);
+
+            #endregion
+
+            #region OrganizationUnitRole.IX_TenantId_RoleId
+
+            modelBuilder.Entity<OrganizationUnitRole>()
+                .Property(e => e.TenantId)
+                .CreateIndex("IX_TenantId_RoleId", 1);
+
+            modelBuilder.Entity<OrganizationUnitRole>()
+                .Property(e => e.RoleId)
+                .CreateIndex("IX_TenantId_RoleId", 2);
+
+            #endregion
+
+            #region OrganizationUnitRole.IX_TenantId_OrganizationUnitId
+
+            modelBuilder.Entity<OrganizationUnitRole>()
+                .Property(e => e.TenantId)
+                .CreateIndex("IX_TenantId_OrganizationUnitId", 1);
+
+            modelBuilder.Entity<OrganizationUnitRole>()
                 .Property(e => e.OrganizationUnitId)
                 .CreateIndex("IX_TenantId_OrganizationUnitId", 2);
 

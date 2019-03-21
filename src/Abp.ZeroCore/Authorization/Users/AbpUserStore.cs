@@ -12,6 +12,7 @@ using Abp.Domain.Repositories;
 using Abp.Domain.Uow;
 using Abp.Extensions;
 using Abp.Linq;
+using Abp.Organizations;
 using Abp.Runtime.Session;
 using Abp.Zero;
 using Castle.Core.Logging;
@@ -69,6 +70,8 @@ namespace Abp.Authorization.Users
         private readonly IRepository<UserLogin, long> _userLoginRepository;
         private readonly IRepository<UserClaim, long> _userClaimRepository;
         private readonly IRepository<UserPermissionSetting, long> _userPermissionSettingRepository;
+        private readonly IRepository<UserOrganizationUnit, long> _userOrganizationUnitRepository;
+        private readonly IRepository<OrganizationUnitRole, long> _organizationUnitRoleRepository;
 
         private readonly IUnitOfWorkManager _unitOfWorkManager;
 
@@ -76,11 +79,13 @@ namespace Abp.Authorization.Users
             IUnitOfWorkManager unitOfWorkManager,
             IRepository<TUser, long> userRepository,
             IRepository<TRole> roleRepository,
-            IAsyncQueryableExecuter asyncQueryableExecuter, 
-            IRepository<UserRole, long> userRoleRepository, 
-            IRepository<UserLogin, long> userLoginRepository, 
-            IRepository<UserClaim, long> userClaimRepository, 
-            IRepository<UserPermissionSetting, long> userPermissionSettingRepository)
+            IAsyncQueryableExecuter asyncQueryableExecuter,
+            IRepository<UserRole, long> userRoleRepository,
+            IRepository<UserLogin, long> userLoginRepository,
+            IRepository<UserClaim, long> userClaimRepository,
+            IRepository<UserPermissionSetting, long> userPermissionSettingRepository, 
+            IRepository<UserOrganizationUnit, long> userOrganizationUnitRepository, 
+            IRepository<OrganizationUnitRole, long> organizationUnitRoleRepository)
         {
             _unitOfWorkManager = unitOfWorkManager;
             UserRepository = userRepository;
@@ -90,6 +95,8 @@ namespace Abp.Authorization.Users
             _userLoginRepository = userLoginRepository;
             _userClaimRepository = userClaimRepository;
             _userPermissionSettingRepository = userPermissionSettingRepository;
+            _userOrganizationUnitRepository = userOrganizationUnitRepository;
+            _organizationUnitRoleRepository = organizationUnitRoleRepository;
 
             AbpSession = NullAbpSession.Instance;
             ErrorDescriber = new IdentityErrorDescriber();
@@ -367,13 +374,14 @@ namespace Abp.Authorization.Users
                 return;
             }
 
-            var role = await _roleRepository.FirstOrDefaultAsync(r => r.NormalizedName== normalizedRoleName);
+            var role = await _roleRepository.FirstOrDefaultAsync(r => r.NormalizedName == normalizedRoleName);
 
             if (role == null)
             {
                 throw new InvalidOperationException(string.Format(CultureInfo.CurrentCulture, "Role {0} does not exist!", normalizedRoleName));
             }
 
+            await UserRepository.EnsureCollectionLoadedAsync(user, u => u.Roles, cancellationToken);
             user.Roles.Add(new UserRole(user.TenantId, user.Id, role.Id));
         }
 
@@ -420,14 +428,22 @@ namespace Abp.Authorization.Users
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            Check.NotNull(user, nameof(user));
+            Check.NotNull(user, nameof(user));;
 
-            var query = from userRole in _userRoleRepository.GetAll()
-                        join role in _roleRepository.GetAll() on userRole.RoleId equals role.Id
-                        where userRole.UserId == user.Id
-                        select role.Name;
+            var userRoles = await _asyncQueryableExecuter.ToListAsync(from userRole in _userRoleRepository.GetAll()
+                join role in _roleRepository.GetAll() on userRole.RoleId equals role.Id
+                where userRole.UserId == user.Id
+                select role.Name);
 
-            return await _asyncQueryableExecuter.ToListAsync(query);
+            var userOrganizationUnitRoles = await _asyncQueryableExecuter.ToListAsync(
+                from userOu in _userOrganizationUnitRepository.GetAll()
+                join roleOu in _organizationUnitRoleRepository.GetAll() on userOu.OrganizationUnitId equals roleOu
+                    .OrganizationUnitId
+                join userOuRoles in _roleRepository.GetAll() on roleOu.RoleId equals userOuRoles.Id
+                where userOu.UserId == user.Id
+                select userOuRoles.Name);
+
+            return userRoles.Union(userOrganizationUnitRoles).ToList();
         }
 
         /// <summary>
@@ -449,15 +465,7 @@ namespace Abp.Authorization.Users
                 throw new ArgumentException(nameof(normalizedRoleName) + " can not be null or whitespace");
             }
 
-            var role = await _roleRepository.FirstOrDefaultAsync(r => r.NormalizedName == normalizedRoleName);
-            if (role == null)
-            {
-                return false;
-            }
-
-            await UserRepository.EnsureCollectionLoadedAsync(user, u => u.Roles, cancellationToken);
-
-            return user.Roles.Any(r => r.RoleId == role.Id);
+            return (await GetRolesAsync(user, cancellationToken)).Any(r => r.ToUpperInvariant() == normalizedRoleName);
         }
 
         /// <summary>
@@ -465,7 +473,7 @@ namespace Abp.Authorization.Users
         /// </summary>
         public void Dispose()
         {
-            
+
         }
 
         /// <summary>
@@ -632,11 +640,11 @@ namespace Abp.Authorization.Users
             Check.NotNull(providerKey, nameof(providerKey));
 
             var query = from userLogin in _userLoginRepository.GetAll()
-                join user in UserRepository.GetAll() on userLogin.UserId equals user.Id
-                where userLogin.LoginProvider == loginProvider &&
-                      userLogin.ProviderKey == providerKey &&
-                      userLogin.TenantId == AbpSession.TenantId
-                select user;
+                        join user in UserRepository.GetAll() on userLogin.UserId equals user.Id
+                        where userLogin.LoginProvider == loginProvider &&
+                              userLogin.ProviderKey == providerKey &&
+                              userLogin.TenantId == AbpSession.TenantId
+                        select user;
 
             return _asyncQueryableExecuter.FirstOrDefaultAsync(query);
         }
@@ -1159,9 +1167,11 @@ namespace Abp.Authorization.Users
         /// <returns>User or null</returns>
         public virtual async Task<TUser> FindByNameOrEmailAsync(string userNameOrEmailAddress)
         {
+            var normalizedUserNameOrEmailAddress = NormalizeKey(userNameOrEmailAddress);
+
             return await UserRepository.FirstOrDefaultAsync(
-                user => (user.UserName == userNameOrEmailAddress || user.EmailAddress == userNameOrEmailAddress)
-                );
+                user => (user.NormalizedUserName == normalizedUserNameOrEmailAddress || user.NormalizedEmailAddress == normalizedUserNameOrEmailAddress)
+            );
         }
 
         /// <summary>
@@ -1220,20 +1230,11 @@ namespace Abp.Authorization.Users
 
         public async Task<string> GetUserNameFromDatabaseAsync(long userId)
         {
-            //note: This workaround will not be needed after fixing https://github.com/aspnetboilerplate/aspnetboilerplate/issues/1828
-            var outerUow = _unitOfWorkManager.Current;
             using (var uow = _unitOfWorkManager.Begin(new UnitOfWorkOptions
             {
-                Scope = TransactionScopeOption.RequiresNew,
-                IsTransactional = false,
-                IsolationLevel = IsolationLevel.ReadUncommitted
+                Scope = TransactionScopeOption.Suppress
             }))
             {
-                if (outerUow != null)
-                {
-                    _unitOfWorkManager.Current.SetTenantId(outerUow.GetTenantId());
-                }
-
                 var user = await UserRepository.GetAsync(userId);
                 await uow.CompleteAsync();
                 return user.UserName;
@@ -1289,6 +1290,7 @@ namespace Abp.Authorization.Users
 
         private const string InternalLoginProvider = "[AspNetUserStore]";
         private const string AuthenticatorKeyTokenName = "AuthenticatorKey";
+        private const string TokenValidityKeyProvider = "TokenValidityKeyProvider";
 
         public virtual async Task SetAuthenticatorKeyAsync(TUser user, string key, CancellationToken cancellationToken)
         {
@@ -1298,6 +1300,50 @@ namespace Abp.Authorization.Users
         public async Task<string> GetAuthenticatorKeyAsync(TUser user, CancellationToken cancellationToken)
         {
             return await GetTokenAsync(user, InternalLoginProvider, AuthenticatorKeyTokenName, cancellationToken);
+        }
+
+        public virtual async Task AddTokenValidityKeyAsync([NotNull] TUser user, string tokenValidityKey, DateTime expireDate, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            Check.NotNull(user, nameof(user));
+
+            await UserRepository.EnsureCollectionLoadedAsync(user, u => u.Tokens, cancellationToken);
+
+            user.Tokens.Add(new UserToken(user, TokenValidityKeyProvider, tokenValidityKey, null, expireDate));
+        }
+
+        public virtual async Task<bool> IsTokenValidityKeyValidAsync([NotNull] TUser user, string tokenValidityKey, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            Check.NotNull(user, nameof(user));
+
+            await UserRepository.EnsureCollectionLoadedAsync(user, u => u.Tokens, cancellationToken);
+            var isValidityKeyValid = user.Tokens.Any(t => t.LoginProvider == TokenValidityKeyProvider &&
+                                               t.Name == tokenValidityKey &&
+                                               t.ExpireDate > DateTime.UtcNow);
+            
+            user.Tokens.RemoveAll(t => t.LoginProvider == TokenValidityKeyProvider && t.ExpireDate <= DateTime.UtcNow);
+
+            return isValidityKeyValid;
+        }
+
+        public virtual async Task RemoveTokenValidityKeyAsync([NotNull] TUser user, string tokenValidityKey, CancellationToken cancellationToken = default(CancellationToken))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            Check.NotNull(user, nameof(user));
+
+            await UserRepository.EnsureCollectionLoadedAsync(user, u => u.Tokens, cancellationToken);
+
+            user.Tokens.Remove(user.Tokens.FirstOrDefault(t =>
+                t.LoginProvider == TokenValidityKeyProvider && t.Name == tokenValidityKey));
+        }
+
+        protected virtual string NormalizeKey(string key)
+        {
+            return key.ToUpperInvariant();
         }
     }
 }
